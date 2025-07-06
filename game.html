@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Color Pathway</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM (UMD) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel to support JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  </head>
+  <body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen flex items-center justify-center">
+    
+    <!-- Return to Lobby Button -->
+    <div class="fixed top-4 left-4 z-50">
+      <a href="gameindex.html" class="bg-gray-800 text-white px-3 py-1 rounded shadow hover:bg-gray-700 text-sm">
+        ← Return to Lobby
+      </a>
+    </div>
+
+    <div id="root"></div>
+
+    <!-- Your React Game Code -->
+    <script type="text/babel">
+      const { useState, useEffect } = React;
+
+      const GRID = 3;
+      const THEMES = {
+        nature: ["bg-green-500", "bg-red-500", "bg-blue-500", "bg-yellow-500"],
+        dark: ["bg-gray-700", "bg-purple-700", "bg-black", "bg-indigo-700"],
+        neon: ["bg-lime-400", "bg-pink-500", "bg-cyan-400", "bg-yellow-400"],
+      };
+
+      function ColorPathway() {
+        const [stage, setStage] = useState("start");
+        const [difficulty, setDifficulty] = useState("beginner");
+        const [theme, setTheme] = useState("nature");
+
+        const [seq, setSeq] = useState([]);
+        const [flash, setFlash] = useState(null);
+        const [input, setInput] = useState([]);
+        const [round, setRound] = useState(1);
+        const [score, setScore] = useState(0);
+
+        const len = difficulty === "beginner" ? 3 : difficulty === "intermediate" ? 5 : 7;
+        const genSeq = (l) => Array.from({ length: l }, () => Math.floor(Math.random() * 9));
+        const nextRound = () => {
+          setSeq(genSeq(len));
+          setInput([]);
+        };
+
+        const startGame = () => {
+          setStage("play");
+          setRound(1);
+          setScore(0);
+          nextRound();
+        };
+
+        useEffect(() => {
+          if (stage !== "play" || seq.length === 0) return;
+          let i = 0;
+          const id = setInterval(() => {
+            setFlash(seq[i]);
+            setTimeout(() => setFlash(null), 350);
+            i++;
+            if (i === seq.length) clearInterval(id);
+          }, 700);
+          return () => clearInterval(id);
+        }, [seq, stage]);
+
+        const handleClick = (idx) => {
+          if (stage !== "play" || flash !== null) return;
+          const next = [...input, idx];
+          setInput(next);
+
+          if (idx !== seq[next.length - 1]) {
+            setStage("end");
+            return;
+          }
+
+          if (next.length === seq.length) {
+            setScore((s) => s + 10);
+            if (round === 3) {
+              setStage("final");
+            } else {
+              setRound((r) => r + 1);
+              nextRound();
+            }
+          }
+        };
+
+        const reset = () => {
+          setStage("start");
+          setInput([]);
+          setSeq([]);
+          setRound(1);
+          setScore(0);
+        };
+
+        const Button = ({ label, active, onClick }) => (
+          <button
+            onClick={onClick}
+            className={`px-4 py-2 rounded transition border ${
+              active ? "bg-blue-600 text-white" : "bg-white hover:bg-gray-200"
+            }`}
+          >
+            {label}
+          </button>
+        );
+
+        return (
+          <main className="text-center space-y-6">
+            {stage === "start" && (
+              <section className="space-y-4">
+                <h1 className="text-3xl font-extrabold">Color Pathway</h1>
+                <div className="space-x-2">
+                  {["beginner", "intermediate", "advanced"].map((key) => (
+                    <Button
+                      key={key}
+                      label={key.charAt(0).toUpperCase() + key.slice(1)}
+                      active={difficulty === key}
+                      onClick={() => setDifficulty(key)}
+                    />
+                  ))}
+                </div>
+                <div className="space-x-2">
+                  {[
+                    { key: "nature", label: "nature" },
+                    { key: "dark", label: "dark" },
+                    { key: "neon", label: "colorful" },
+                  ].map(({ key, label }) => (
+                    <Button key={key} label={label} active={theme === key} onClick={() => setTheme(key)} />
+                  ))}
+                </div>
+                <button
+                  onClick={startGame}
+                  className="mt-4 px-6 py-2 bg-green-500 text-white font-bold rounded hover:opacity-90"
+                >
+                  Start
+                </button>
+              </section>
+            )}
+
+            {stage === "play" && (
+              <section className="space-y-4">
+                <h2 className="text-xl font-semibold">Round {round}</h2>
+                <div className="grid grid-cols-3 gap-2 w-72 mx-auto">
+                  {Array.from({ length: GRID * GRID }).map((_, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => handleClick(idx)}
+                      className={`aspect-square rounded cursor-pointer transition-all duration-200 ${
+                        flash === idx
+                          ? THEMES[theme][idx % THEMES[theme].length]
+                          : "bg-gray-300 dark:bg-gray-700"
+                      }`}
+                    ></div>
+                  ))}
+                </div>
+                {input.length === 0 && flash === null && (
+                  <p className="text-green-600 font-medium animate-pulse">Your turn!</p>
+                )}
+              </section>
+            )}
+
+            {stage === "end" && (
+              <section className="space-y-4">
+                <h2 className="text-2xl text-red-600 font-bold">Oops! Wrong Tile</h2>
+                <p>Score: {score}</p>
+                <button onClick={reset} className="px-4 py-2 bg-blue-500 text-white rounded">
+                  Play Again
+                </button>
+              </section>
+            )}
+
+            {stage === "final" && (
+              <section className="space-y-4">
+                <h2 className="text-2xl font-bold">Memory Level: Solid Beginner</h2>
+                <p className="text-xl">Score: {score}</p>
+                <p className="text-gray-500">Try Intermediate next time!</p>
+                <div className="space-x-2">
+                  <button onClick={reset} className="px-4 py-2 bg-green-500 text-white rounded">
+                    Play Again
+                  </button>
+                  <button
+                    onClick={() => {
+                      setDifficulty("intermediate");
+                      reset();
+                    }}
+                    className="px-4 py-2 bg-yellow-500 text-white rounded"
+                  >
+                    Next Level
+                  </button>
+                </div>
+              </section>
+            )}
+          </main>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(<ColorPathway />);
+    </script>
+  </body>
+</html>

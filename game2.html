@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Color Pathway – Dark × Neon</title>
+
+  <!-- 1️⃣ Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- 2️⃣ React 18 + ReactDOM（UMD）-->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+  <!-- 3️⃣ Babel（让浏览器即时编译 JSX）-->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+
+<body class="bg-gray-900 text-white min-h-screen flex items-center justify-center">
+  <!-- Return to Lobby Button -->
+  <div class="fixed top-4 left-4 z-50">
+    <a href="gameindex.html"
+       class="bg-gray-800 text-white px-3 py-1 rounded shadow hover:bg-gray-700 text-sm">
+      ← Return to Lobby
+    </a>
+  </div>
+
+  <div id="root"></div>
+
+  <!-- 4️⃣ 写在 text/babel 里，不能再有 import / TypeScript -->
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    /* ===== 配置 ===== */
+    const GRID = 4;
+    const COLORS = ["bg-purple-400","bg-cyan-400","bg-orange-400","bg-yellow-400","bg-blue-400"];
+    const DIFF_STEPS = { easy: 5, medium: 8, hard: 12 };
+
+    function App() {
+      /* ---------- 状态 ---------- */
+      const [stage, setStage] = useState("start");     // start | options | play | fail | summary
+      const [difficulty, setDifficulty] = useState("easy");
+      const [seq, setSeq] = useState([]);
+      const [flash, setFlash] = useState(null);
+      const [input, setInput] = useState([]);
+      const [failIdx, setFailIdx] = useState(null);
+      const [score, setScore] = useState(null);
+
+      /* ---------- 生成序列 ---------- */
+      const genSeq = len => Array.from({ length: len }, () => Math.floor(Math.random() * 16));
+
+      const startGame = () => {
+        setSeq(genSeq(DIFF_STEPS[difficulty]));
+        setInput([]);
+        setFailIdx(null);
+        setScore(null);
+        setStage("play");
+      };
+
+      /* ---------- 播放闪烁 ---------- */
+      useEffect(() => {
+        if (stage !== "play" || seq.length === 0) return;
+        let i = 0;
+        const timer = setInterval(() => {
+          setFlash(seq[i]);
+          setTimeout(() => setFlash(null), 350);
+          if (++i === seq.length) clearInterval(timer);
+        }, 700);
+        return () => clearInterval(timer);
+      }, [seq, stage]);
+
+      /* ---------- 点击 ---------- */
+      const handleClick = idx => {
+        if (stage !== "play" || flash !== null) return;
+        const next = [...input, idx];
+        setInput(next);
+
+        if (idx !== seq[next.length - 1]) {           // 错了
+          setFailIdx(next.length - 1);
+          setStage("fail");
+          return;
+        }
+
+        if (next.length === seq.length) {            // 全对
+          setScore(Math.round((seq.length / DIFF_STEPS[difficulty]) * 100));
+          setStage("summary");
+        }
+      };
+
+      /* ---------- 通用按钮 ---------- */
+      const Btn = ({children, onClick, active}) => (
+        <button
+          onClick={onClick}
+          className={`w-full py-2 rounded text-sm font-medium transition border
+                     ${ active ? "bg-purple-500 text-white"
+                               : "bg-white text-black hover:bg-gray-200"}`}>
+          {children}
+        </button>
+      );
+
+      /* ---------- 界面 ---------- */
+      return (
+        <main className="w-full max-w-sm text-center space-y-6">
+
+          {/* --- 首页 --- */}
+          {stage === "start" && (
+            <section className="bg-gray-800 p-8 rounded-xl space-y-4">
+              <h1 className="text-2xl font-semibold">Color Pathway</h1>
+              <Btn onClick={() => setStage("options")}>Options</Btn>
+              <button onClick={startGame}
+                      className="w-full py-2 bg-purple-500 rounded hover:opacity-90">
+                Start Training
+              </button>
+            </section>
+          )}
+
+          {/* --- 选项 --- */}
+          {stage === "options" && (
+            <section className="bg-gray-800 p-6 rounded-xl space-y-6">
+              <h2 className="text-xl font-medium">Options</h2>
+              <div className="space-y-2">
+                <p className="text-gray-300">Difficulty</p>
+                {["easy","medium","hard"].map(k => (
+                  <Btn key={k} active={difficulty === k} onClick={() => setDifficulty(k)}>
+                    {k.charAt(0).toUpperCase()+k.slice(1)}
+                  </Btn>
+                ))}
+              </div>
+              <p className="text-gray-400 text-sm">Theme: Dark × Neon (fixed)</p>
+              <button onClick={startGame}
+                      className="w-full py-2 bg-purple-500 rounded hover:opacity-90">
+                Start Training
+              </button>
+            </section>
+          )}
+
+          {/* --- 游戏 --- */}
+          {stage === "play" && (
+            <>
+              <h2 className="text-lg text-gray-300">Follow the pattern…</h2>
+              <div className="grid grid-cols-4 gap-2 w-80 mx-auto">
+                {Array.from({ length: GRID*GRID }).map((_, idx) => (
+                  <div key={idx}
+                       onClick={() => handleClick(idx)}
+                       className={`aspect-square rounded cursor-pointer border-2 transition-all
+                         ${ flash === idx
+                             ? COLORS[idx % COLORS.length]
+                             : failIdx !== null && seq[failIdx] === idx
+                               ? "border-red-500 border-dashed"
+                               : "bg-gray-700 border-gray-600" }`} />
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* --- 失败 --- */}
+          {stage === "fail" && (
+            <section className="bg-gray-800 p-6 rounded-xl space-y-4">
+              <h2 className="text-xl text-red-400 font-bold">Try Again</h2>
+              <p className="text-gray-300">Focus on the pattern next time!</p>
+              <button onClick={() => setStage('start')}
+                      className="px-4 py-2 bg-purple-500 rounded">Retry</button>
+            </section>
+          )}
+
+          {/* --- 结果 --- */}
+          {stage === "summary" && (
+            <section className="bg-gray-800 p-6 rounded-xl space-y-4">
+              <h2 className="text-xl font-bold">Today’s Memory Score: {score}%</h2>
+              <p className="text-gray-400 text-sm">Returning daily helps strengthen your memory</p>
+              <div className="space-x-2">
+                <button onClick={() => setStage('start')}
+                        className="px-4 py-2 bg-purple-500 rounded">Retry</button>
+                <button className="px-4 py-2 bg-gray-600 rounded">Come back tomorrow</button>
+              </div>
+            </section>
+          )}
+
+        </main>
+      );
+    }
+
+    /* ---------- 挂载 ---------- */
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
